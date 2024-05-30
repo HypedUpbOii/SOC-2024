@@ -17,6 +17,10 @@ vec schurProduct(vec v1, vec v2) {
     // implemented by you, naive schur product
     // start of user code
     // end of user code
+    for(int i = 0; i < v1.size; i++){
+        v1.arr[i] *= v2.arr[i];
+    }
+    return v1;
 }
 
 int sum (vec v) {
