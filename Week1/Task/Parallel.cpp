@@ -1,6 +1,7 @@
 #include "matrix.h"
+#include <vector>
 #define Loop(i,a,b) for (int i = a ; i < b ; i++)
-#define MAX_THREADS 8
+#define MAX_THREADS 20
 using namespace std;
 
 Matrix::Matrix(int a, int b) { // generate a matrix (2D array) of dimensions a,b
@@ -50,22 +51,39 @@ Matrix* Matrix::multiplyMatrix(Matrix* N) {
         return NULL;
     }
     Matrix *c = new Matrix(this->n,N->m);
-
-    /*
+    vector<thread> threads;
     
-    BEGIN STUDENT CODE
-    INPUT : this : pointer to matrix A
-            N    : pointer to matrix B
+    // method 1
+    int num_threads = min(MAX_THREADS, this->n);
+    int start_row = 0;
+    int remaining = this->n % num_threads;
+    int num_rows = this->n / num_threads;
+    if (remaining) num_rows++;
+    for(int i = 0; i < num_threads; i++){
+        if ((remaining > 0) && (i > remaining - 1)) num_rows--;
+        threads.push_back(thread(&Matrix::sum_up, ref(*this), ref(*N), ref(*c), start_row, num_rows, this->m));
+        start_row += num_rows;
+    }
 
-    OUTPUT : C   : pointer to matrix C = A*B
-
-    matrix multiplication is defined as following:
-    if input matrix A is a matrix of dimensions n1 by n2 and B is a matrix of dimension n2 by n3 then matrix product C = A*B is defined as
-    C[i][j] = sum over k = 0 to n2-1 {A[i][k]*B[k][j]}
-
+    // method 2
+    /*
+    int x, y, a, b;
+    y = (this->n * N->m) - (MAX_THREADS * ((this->n * N->m) / MAX_THREADS));
+    x = MAX_THREADS - y;
+    a = (this->n * N->m) / MAX_THREADS;
+    b = this->m;
+    for(int i = 0; i < y; i++){
+        threads.push_back(thread(&Matrix::sum_up, ref(*this), ref(*N), ref(*c), a + 1, i * (a + 1), b));
+    }
+    for(int i = 0; i < x; i++){
+        threads.push_back(thread(&Matrix::sum_up, ref(*this), ref(*N), ref(*c), a, (y * (a + 1)) + (i * a), b));
+    }
     */
-    cout<<"STUDENT CODE NOT IMPLEMENTED!\n";
-    exit(1);
+
+    for(auto& t : threads){
+        if(t.joinable()){
+            t.join();
+        }   
+    }
     return c;
 }
-
