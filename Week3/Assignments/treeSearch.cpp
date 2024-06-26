@@ -3,6 +3,8 @@
 #include <xmmintrin.h>
 #include <chrono>
 #include <bits/stdc++.h>
+#include <atomic>
+#include <mutex>
 
 using namespace std;
 
@@ -10,8 +12,8 @@ using namespace std;
 
 TASK:
 Given a tree consisting of nodes and a special integer k, find the secret of the node with value k
-A secret of a node t is defined as a string s, such that s[i] is the bit of the ith node occurring on the path from root to t 
-Each node contains 3 members : 
+A secret of a node t is defined as a string s, such that s[i] is the bit of the ith node occurring on the path from root to t
+Each node contains 3 members :
 1] value - the integer value of the node (unique to each node)
 2] bit - a character of each node (not necessarily unique)
 3] children - a vector containing pointers to all children of the node
@@ -19,83 +21,153 @@ YOU MUST OUTPERFORM THE NAIVE IMPLEMENTATION
 
 */
 
-class node {
+class node
+{
 public:
     int value;
-    vector<node*> children;
+    vector<node *> children;
     char bit;
-    node* parent;
+    node *parent;
 };
 
-class tree {
+class tree
+{
 private:
     int n;
     vector<node *> listOfNodes;
+
 public:
-    node* root;
-    void addConnection (node *a, node *b) { // adds b as child of a
+    node *root;
+    void addConnection(node *a, node *b)
+    { // adds b as child of a
         a->children.push_back(b);
     }
-    tree(int a) {
+    tree(int a)
+    {
         n = a;
     }
-    void setListOfNodes (vector<node*> list) {
-        if (list.size() != n) {
-            cout<<"ERROR, PROVIDED LIST SIZE DOES NOT MATCH SIZE OF TREE!\n";
+    void setListOfNodes(vector<node *> list)
+    {
+        if (list.size() != n)
+        {
+            cout << "ERROR, PROVIDED LIST SIZE DOES NOT MATCH SIZE OF TREE!\n";
             exit(1);
         }
         listOfNodes = list;
     }
-    ~tree() {
-        for (int i=0; i<n; i++) {
+    ~tree()
+    {
+        for (int i = 0; i < n; i++)
+        {
             delete listOfNodes[i];
         }
     }
-    int getSize () {
+    int getSize()
+    {
         return n;
     }
 };
 
-string naiveSearch (tree &T, int k) {
-    queue<node*> q;
+string naiveSearch(tree &T, int k)
+{
+    queue<node *> q;
     q.push(T.root);
-    while (!q.empty()) {
+    while (!q.empty())
+    {
         node *tmp = q.front();
         q.pop();
-        if (tmp->value == k) { // found it!
-            vector<node*> seq; // vector to construct the string
+        if (tmp->value == k)
+        {                       // found it!
+            vector<node *> seq; // vector to construct the string
             seq.push_back(tmp);
             node *u = tmp->parent;
-            while (u != NULL) {
+            while (u != NULL)
+            {
                 seq.push_back(u);
-                u = u->parent;    
+                u = u->parent;
             }
             string t;
-            for (int i=seq.size() - 1; i >= 0; i--) {
+            for (int i = seq.size() - 1; i >= 0; i--)
+            {
                 t += seq[i]->bit;
             }
             return t;
         }
-        for (auto x : tmp->children) {
+        for (auto x : tmp->children)
+        {
             q.push(x);
         }
     }
     return "\0";
 }
 
-string optim(tree &T, int k) {
-/*
+void nodefinder(node *n,atomic<bool>& found, int k, node*& req, mutex& m)
+{
+    if (found.load()) {
+        return;
+    }
+    if (n->value == k) {
+        lock_guard<mutex> lock(m);
+        if (!found.load()){
+            req = n;
+            found.store(true);
+        }
+        return;
+    }
+    for (auto& leaf: n->children) {
+        if (found.load()) {
+            return;
+        }
+        nodefinder(leaf, found, k, req, m);
+    }
+}
 
-STUDENT CODE BEGINS HERE, ACHIEVE A SPEEDUP OVER NAIVE IMPLEMENTATION
-YOU MAY EDIT THIS FILE HOWEVER YOU WANT (as long as you don't touch main or naiveSearch)
-HINT : USE MULTITHREADING TO SEARCH IN SUBTREES THEN RETURN THE MOMENT U FIND IT
-(Note we do not expect to see a speedup for low values of n, but for n > 10000)
+string optim(tree &T, int k)
+{
+    /*
 
-*/
+    STUDENT CODE BEGINS HERE, ACHIEVE A SPEEDUP OVER NAIVE IMPLEMENTATION
+    YOU MAY EDIT THIS FILE HOWEVER YOU WANT (as long as you don't touch main or naiveSearch)
+    HINT : USE MULTITHREADING TO SEARCH IN SUBTREES THEN RETURN THE MOMENT U FIND IT
+    (Note we do not expect to see a speedup for low values of n, but for n > 10000)
 
-    cout<<"Student code not implemented\n";
-    exit(1);
-
+    */
+    node *req = nullptr;
+    atomic<bool> found(false);
+    vector<thread> yarn; // yarn = many threads sry for the bad joke
+    mutex m;
+    node *temp = T.root;
+    if (temp->value == k) {
+        req = temp;
+        found.store(true);
+    }
+    else {
+        for (auto &leaf : temp->children) {
+            yarn.push_back(thread(nodefinder, leaf, ref(found), k, ref(req), ref(m)));
+        }
+    }
+    for (auto& v: yarn) {
+        if (v.joinable()) {
+            v.join();
+        }
+    }
+    if (found.load() && req != nullptr) {
+        vector<node *> seq;
+        seq.push_back(req);
+        node *u = req->parent;
+        while (u != nullptr)
+        {
+            seq.push_back(u);
+            u = u->parent;
+        }
+        string t;
+        for (int i = seq.size() - 1; i >= 0; i--)
+        {
+            t += seq[i]->bit;
+        }
+        return t;
+    }
+    return "\0";
 }
 
 int main() {
@@ -116,22 +188,24 @@ int main() {
         tmp->bit = currChar;
         if (currChar == 'z') {
             currChar = 'a';
-        } else {
+        }
+        else {
             currChar++;
         }
         if (i % 3 == 0) {
             T.addConnection(list[i / 3 - 1], tmp);
-            tmp->parent = list[i/3-1];
-        } else {
+            tmp->parent = list[i / 3 - 1];
+        }
+        else {
             T.addConnection(list[i / 3], tmp);
-            tmp->parent = list[i/3];
+            tmp->parent = list[i / 3];
         }
         list.push_back(tmp);
     }
     T.setListOfNodes(list);
 
     auto startNaive = chrono::high_resolution_clock::now();
-    string naive = naiveSearch(T,n-1);
+    string naive = naiveSearch(T, n - 1);
     auto endNaive = chrono::high_resolution_clock::now();
     auto naiveTime = chrono::duration_cast<chrono::duration<double>>(endNaive - startNaive);
 
@@ -140,10 +214,10 @@ int main() {
     auto endOptim = chrono::high_resolution_clock::now();
     auto optimTime = chrono::duration_cast<chrono::duration<double>>(endOptim - startOptim);
 
-    cout<<"Naive string : "<<naive<<endl;
-    cout<<"Optim string : "<<optimSearch<<endl;
-    cout<<"Naive time : "<<naiveTime.count()<<endl;
-    cout<<"Optim time : "<<optimTime.count()<<endl;
+    cout << "Naive string : " << naive << endl;
+    cout << "Optim string : " << optimSearch << endl;
+    cout << "Naive time : " << naiveTime.count() << endl;
+    cout << "Optim time : " << optimTime.count() << endl;
 
     return 0;
 }

@@ -64,6 +64,43 @@ Then it computes softmax in O(n)
 
 }
 
+void softFirst (float *A, float *B, int start, int elem) {
+    for (int i = 0; i < elem; i++) {
+        B[start + i] = exp(-quake3Algo(A[start + i]));
+    }
+}
+
+void softSecond (float* B, int start, int elem, float sum) {
+    __m256 sum_vec = _mm256_set1_ps(sum);
+    for (int i = 0; i < elem / 8 * 8; i += 8) {
+        __m256 b = _mm256_loadu_ps(B + start + i);
+        __m256 normalized = _mm256_div_ps(b, sum_vec);
+        _mm256_storeu_ps(B + start + i, normalized);
+    }
+    for (int i = elem / 8 * 8; i < elem; i++) {
+        B[start + i] /= sum;
+    }
+}
+
+void simdPartialSum (float* B, int start, int elem, vector<float>& pSums, int thread_id) {
+    __m256 sum = _mm256_setzero_ps();
+    size_t i;
+    for (i = 0; i < elem / 8 * 8; i += 8) {
+        __m256 data = _mm256_loadu_ps(B + start + i);
+        sum = _mm256_add_ps(sum, data);
+    }
+    float result[8];
+    _mm256_storeu_ps(result, sum);
+    float total = 0.0f;
+    for (int j = 0; j < 8; ++j) {
+        total += result[j];
+    }
+    for (; i < elem; ++i) {
+        total += B[start + i];
+    }
+    pSums[thread_id] = total;
+}
+
 void optimal (float *A, float *B, int n) {
 
 /*
@@ -73,11 +110,37 @@ YOU MAY EDIT THIS FILE HOWEVER YOU WANT
 HINT : USE SIMD INSTRUCTIONS, YOU MAY FIND SOMETHING BEAUTIFUL ONLINE. THEN USE MULTITHREADING FOR SOFTMAX
 (Note we do not expect to see a speedup for low values of n, but for n > 100000)
 
-*/
+*/  
 
-    cout<<"Student code not implemented\n";
-    exit(1);
-
+    int num_threads = min(n, int(thread::hardware_concurrency()));
+    thread yarn[num_threads];
+    vector<float> partialSum(num_threads, 0.0f);
+    int chunk_size = n / num_threads;
+    for (int i = 0; i < num_threads; i++) {
+        int start = i * chunk_size;
+        int elem = (i == num_threads - 1) ? (n - start) : chunk_size;
+        yarn[i] = thread(softFirst, A, B, start, elem);
+    }
+    for (int i = 0; i < num_threads; i++) {
+        yarn[i].join();
+    }
+    for (int i = 0; i < num_threads; i++) {
+        int start = i * chunk_size;
+        int elem = (i == num_threads - 1) ? (n - start) : chunk_size;
+        yarn[i] = thread(simdPartialSum, B, start, elem, ref(partialSum), i);
+    }
+    for (int i = 0; i < num_threads; i++) {
+        yarn[i].join();
+    }
+    float sum = accumulate(partialSum.begin(), partialSum.end(), 0.0f);
+    for (int i = 0; i < num_threads; i++) {
+        int start = i * chunk_size;
+        int elem = (i == num_threads - 1) ? (n - start) : chunk_size;
+        yarn[i] = thread(softSecond, B, start, elem, sum);
+    }
+    for (int i = 0; i < num_threads; i++) {
+        yarn[i].join();
+    }
 }
 
 int main () {

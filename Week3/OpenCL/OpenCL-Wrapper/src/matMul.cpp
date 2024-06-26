@@ -20,9 +20,10 @@ int main () {
     auto start = std::chrono::high_resolution_clock::now();
 
 	// TASK 2 CODE BEGINS HERE
-	std::cout<<"Task 2 code not implemented!\n";
-	wait();
-	exit(1);
+	A3.write_to_device();
+	B3.write_to_device();
+	matMul.run();
+	C3.read_from_device();
 	// TASK 2 CODE ENDS HERE
 
     auto end = std::chrono::high_resolution_clock::now();

@@ -4,8 +4,8 @@ using namespace std;
 #define pll pair<ll,ll>
 #define pp pair<pll,pll>
 #define mp make_pair
-// #define f first
-// #define s second 
+#define f first
+#define s second
 
 ll naive (ll n) {
     ll dp[n+1];
@@ -17,23 +17,42 @@ ll naive (ll n) {
     return dp[n];
 }
 
+void ppMul(pp& A, const pp& B);
+
 ll optim(ll n){
-/*
+    /*
 
-STUDENT CODE BEGINS HERE, ACHIEVE A SPEEDUP OVER NAIVE IMPLEMENTATION
-YOU MAY EDIT THIS FILE HOWEVER YOU WANT
-HINT : Use the same principle behind fast exponentiation, to calculate the nth fibonacci number in O(logn) time complexity
-You can view the tuple (f(n), f(n-1)) as a matrix multiplication of ((1,1),(1,0))*(f(n-1),f(n-2)) 
-because f(n) = f(n-1)*1 + f(n-2)*1 while f(n-1) = 1*f(n-1) + 0*f(n-2)
-Therefore, we can compute (f(n),f(n-1)) is equal to {((1,1),(1,0))^(n-1)} * (f(1),f(0))
-This can be computed in O(logn) time
-We expect your code to be faster (and completely inaccurate, as even naive method is inaccurate) for n >= 1000
+    STUDENT CODE BEGINS HERE, ACHIEVE A SPEEDUP OVER NAIVE IMPLEMENTATION
+    YOU MAY EDIT THIS FILE HOWEVER YOU WANT
+    HINT : Use the same principle behind fast exponentiation, to calculate the nth fibonacci number in O(logn) time complexity
+    You can view the tuple (f(n), f(n-1)) as a matrix multiplication of ((1,1),(1,0))*(f(n-1),f(n-2)) 
+    because f(n) = f(n-1)*1 + f(n-2)*1 while f(n-1) = 1*f(n-1) + 0*f(n-2)
+    Therefore, we can compute (f(n),f(n-1)) is equal to {((1,1),(1,0))^(n-1)} * (f(1),f(0))
+    This can be computed in O(logn) time
+    We expect your code to be faster (and completely inaccurate, as even naive method is inaccurate) for n >= 1000
 
-*/
+    */
+    n--;
+    pp fibMatrix = mp(mp(1, 1), mp(1, 0));
+    pp ansMatrix = mp(mp(1, 0), mp(0, 1));
+    ll i = 1;
+    while (n >= i) {
+        if (n & i) ppMul(ansMatrix, fibMatrix);
+        ppMul(fibMatrix, fibMatrix);
+        i = i << 1;
+    }
+    return ansMatrix.f.f;
+}
 
-cout<<"Student code not implemented\n";
-exit(1);
-
+void ppMul(pp& A, const pp& B) {
+    ll a = A.f.f * B.f.f + A.f.s * B.s.f;
+    ll b = A.f.f * B.f.s + A.f.s * B.s.s;
+    ll c = A.s.f * B.f.f + A.s.s * B.s.f;
+    ll d = A.s.f * B.f.s + A.s.s * B.s.s;
+    A.f.f = a;
+    A.f.s = b;
+    A.s.f = c;
+    A.s.s = d;
 }
 
 int main(){
