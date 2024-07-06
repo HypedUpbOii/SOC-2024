@@ -12,6 +12,7 @@ LogisticRegression::LogisticRegression(uint64_t D){
 matrix LogisticRegression::sigmoid(matrix z){
     matrix g = 1.0*ones(z.rows,1);
     // Implement sigmoid function here as defined in README.md    
+    g = exp(z) / (1 + exp(z));
     return g;
 }
 
@@ -24,6 +25,9 @@ double LogisticRegression::logisticLoss(matrix X, matrix Y){
     }
     double loss = 0;
     // Compute the log loss as defined in README.md
+    matrix oneMinusPred = 1 - Y_pred; // why couldn't the operator overloading be member functions and return a const optionally ( ㄏ-᷅_-᷄)ㄏ
+    loss -= (dot(Y.transpose(), log(Y_pred)) + dot((1 - Y).transpose(), log(oneMinusPred)));
+    loss /= X.shape().first;
     return loss;
 }
 
@@ -36,13 +40,26 @@ pair<matrix, double> LogisticRegression::lossDerivative(matrix X, matrix Y){
     }
     //Compute gradients as defined in README.md
     matrix dw(d,1);
-    double db; 
+    double db = 0; 
+    dw = matmul(X.transpose(), (Y_pred - Y));
+    dw = dw / X.shape().first;
+    for (uint64_t i = 0; i < X.shape().first; i++) {
+        db += Y_pred(i) - Y(i);
+    }
+    db /= X.shape().first;
     return {dw,db};
 }
 
 matrix LogisticRegression::predict(matrix X){
-    matrix Y_pred(X.shape().first,0);
+    matrix Y_pred(X.shape().first,1);
     // Using the weights and bias, find the values of y for every x in X
+    Y_pred = sigmoid(matmul(X, weights) + bias);
+    for (uint64_t i = 0; i < X.shape().first; i++) {
+        if (Y_pred(i) >= 0.5) {
+            Y_pred(i) = 1;
+        }
+        else Y_pred(i) = 0;
+    }
     return Y_pred;
 }  
 
@@ -54,6 +71,11 @@ void LogisticRegression::GD(matrix X, matrix Y,double learning_rate, uint64_t li
     max_iterations = limit;
     while (fabs(loss - old_loss) > epsilon && iteration < max_iterations){
         // Calculate the gradients and update the weights and bias correctly. Do not edit anything else 
+        pair <matrix, double> gradient = lossDerivative(X,Y);
+        weights -= eta * gradient.first;
+        bias -= eta * gradient.second;
+        old_loss = loss;
+        loss = logisticLoss(X,Y);
         if (iteration %100 == 0) train_loss.PB(loss);
         iteration++;
     }
@@ -81,6 +103,12 @@ void LogisticRegression::test(matrix X,matrix Y){
 double LogisticRegression::accuracy(matrix Y_pred, matrix Y){
     double acc = 0;
     // Compute the accuracy of the model
+    for (uint64_t i = 0; i < Y.shape().first; i++) {
+        if (Y_pred(i) == Y(i)) {
+            acc++;
+        }
+    }
+    acc /= Y.shape().first;
     return acc;
 }
 

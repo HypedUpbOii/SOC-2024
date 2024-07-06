@@ -18,6 +18,10 @@ double LinearRegression::l2loss(matrix X, matrix Y){
     }
     double loss = 0;
     // Compute the mean squared loss as defined in README.md
+    for (int i = 0; i < X.shape().first; i++) {
+        loss += pow(Y_pred(i) - Y(i), 2);
+    }
+    loss /= X.shape().first;
     return loss;
 }
 
@@ -30,13 +34,20 @@ pair<matrix, double> LinearRegression::l2lossDerivative(matrix X, matrix Y){
     }
     //Compute gradients as defined in README.md
     matrix dw(d,1);
-    double db; 
+    double db = 0;
+    dw = matmul(X.transpose(), Y_pred - Y);
+    for (uint64_t i = 0; i < X.shape().first; i++) {
+        db += Y_pred(i) - Y(i);
+    }
+    dw = dw / X.shape().first;
+    db /= X.shape().first;
     return {dw,db};
 }
 
 matrix LinearRegression::predict(matrix X){
-    matrix Y_pred(X.shape().first,0);
+    matrix Y_pred(X.shape().first,1);
     // Using the weights and bias, find the values of y for every x in X
+    Y_pred = matmul(X, weights) + bias;
     return Y_pred;
 }  
 
@@ -47,7 +58,12 @@ void LinearRegression::GD(matrix X, matrix Y,double learning_rate, uint64_t limi
     uint64_t iteration = 0;
     max_iterations = limit;
     while (fabs(loss - old_loss) > epsilon && iteration < max_iterations){
-        // Calculate the gradients and update the weights and bias correctly. Do not edit anything else 
+        // Calculate the gradients and update the weights and bias correctly. Do not edit anything else
+        pair<matrix, double> gradient = l2lossDerivative(X, Y);
+        weights -= eta * gradient.first;
+        bias -= eta * gradient.second;
+        old_loss = loss;
+        loss = l2loss(X,Y);
         if (iteration %100 == 0) train_loss.PB(loss);
         iteration++;
     }
@@ -86,6 +102,10 @@ void LinearRegression::test(matrix X,matrix Y){
 double LinearRegression::accuracy(matrix Y_pred, matrix Y){
     double acc = 0; 
     // Compute the accuracy of the model
+    for (uint64_t i = 0; i < Y_pred.shape().first; i++) {
+        acc += fabs(Y_pred(i) - Y(i)) / fabs(Y(i));
+    }
+    acc /= Y_pred.shape().first;
     return acc;
 }
 

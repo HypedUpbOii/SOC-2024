@@ -13,6 +13,11 @@ matrix Regression::transform(matrix X){
     uint64_t n = X.shape().first;
     matrix PHI(n,d);
     // Compute the transform of X as defined in README.md
+    for (uint64_t i = 0; i < n; ++i) {
+        for (uint64_t j = 0; j < d; ++j) {
+            PHI(i, j) = pow(X(i, 0), j + 1);
+        }
+    }
     return PHI;
 }
 
@@ -25,6 +30,10 @@ double Regression::l2loss(matrix X, matrix Y){
     }
     double loss = 0;
     // Compute the mean squared loss as defined in README.md
+    for (uint64_t i = 0; i < X.shape().first; i++) {
+        loss += pow(Y_pred(i) - Y(i), 2);
+    }
+    loss /= X.shape().first;
     return loss;
 }
 
@@ -37,13 +46,20 @@ pair<matrix, double> Regression::l2lossDerivative(matrix X, matrix Y){
     }
     //Compute gradients as defined in README.md
     matrix dw(d,1);
-    double db; 
+    double db;
+    dw = matmul(X.transpose(), (Y_pred - Y));
+    dw = dw / X.shape().first;
+    for (uint64_t i = 0; i < X.shape().first; i++) {
+        db += Y_pred(i) - Y(i);
+    }
+    db /= X.shape().first;
     return {dw,db};
 }
 
 matrix Regression::predict(matrix X){
-    matrix Y_pred(X.shape().first,0);
+    matrix Y_pred(X.shape().first,1);
     // Using the weights and bias, find the values of y for every x in X
+    Y_pred = matmul(X, weights) + bias;
     return Y_pred;
 }  
 
@@ -54,7 +70,12 @@ void Regression::GD(matrix X, matrix Y,double learning_rate, uint64_t limit){
     uint64_t iteration = 0;
     max_iterations = limit;
     while (fabs(loss - old_loss) > epsilon && iteration < max_iterations){
-        // Calculate the gradients and update the weights and bias correctly. Do not edit anything else 
+        // Calculate the gradients and update the weights and bias correctly. Do not edit anything else
+        pair<matrix, double> gradient = l2lossDerivative(X, Y);
+        weights -= eta * gradient.first;
+        bias -= eta * gradient.second;
+        old_loss = loss;
+        loss = l2loss(X, Y);
         if (iteration %100 == 0) train_loss.PB(loss);
         iteration++;
     }
@@ -97,6 +118,10 @@ void Regression::test(matrix X,matrix Y){
 double Regression::accuracy(matrix Y_pred, matrix Y){
     double acc = 0;
     // Compute the accuracy of the model
+    for (uint64_t i = 0; i < Y_pred.shape().first; i++) {
+        acc += fabs(Y_pred(i) - Y(i)) / fabs(Y(i));
+    }
+    acc /= Y_pred.shape().first;
     return acc;
 }
 
