@@ -15,14 +15,15 @@ Davis–Putnam–Logemann–Loveland (DPLL) Algorithm:
 #define UNDEFINED -1
 #define TRUE 1
 #define FALSE 0
+#define uint unsigned int
 
 class dpll {
     private:
     uint numVariables;
     uint numClauses;
     vector<vector<int>> clauses;
-    bool unitProp (vector<int> partialModel);
-    bool doPll (vector<int> partialModel);
+    bool unitProp (vector<int>& partialModel); // top ten bruh moments pass by ref
+    bool doPll (vector<int>& partialModel); // same
     
     public:
     vector<int> finalModel;
@@ -64,56 +65,80 @@ void dpll::getInput () {
     }
 }
 
-bool dpll::unitProp (vector<int> partialModel) {
-/*
-
-Implement unit propogation!
-while (true) {
-
-    if (there exists some clause C, such that there is only one undecided variable in C) {
-        decide the variable so as to make C true; (i.e. if C is x, then set x to true, else if C is -x, set x to false)
+bool dpll::unitProp (vector<int>& partialModel) {
+    while (true) {
+        bool unitClause = false;
+        for (auto& clause: clauses) {
+            uint unassignedVariables = 0;
+            int unassignedLiteral = 0;
+            bool clauseSatisfied = false;
+            for (auto& literal: clause) {
+                uint variableNumber = abs(literal);
+                int parity = (literal > 0) ? TRUE : FALSE;
+                if (partialModel[variableNumber] == UNDEFINED) {
+                    unassignedVariables++;
+                    unassignedLiteral = literal;
+                }
+                if (partialModel[variableNumber] == parity) {
+                    clauseSatisfied = true;
+                    break; // one literal required for clause to be SAT
+                }
+            }
+            if (!clauseSatisfied && (unassignedVariables == 0)) {
+                return false; // all literals assigned yet clause is false, contradiction
+            }
+            if (!clauseSatisfied && (unassignedVariables == 1)) {
+                partialModel[abs(unassignedLiteral)] = (unassignedLiteral > 0) ? TRUE : FALSE;
+                unitClause = true;
+            }
+        }
+        if (!unitClause) {
+            break;
+        }
     }
-    if (some clause becomes false) {
-        return false;
-    }
-    if (no such clause exists) {
-        break;
-    }
-
-}
-
-*/
-}
-
-bool dpll::doPll (vector<int> partialModel) {
-
-/*
-
-Implement the dpll algorithm
-unitProp(partialModel)
-if (formula is SAT) {
-    finalModel = partialModel;
     return true;
 }
-else {
-    if (there exists variable x, partialModel[x] == UNDECIDED) {
-        posMod = partialModel;
-        posMod[x] = 1;
-        negMod = partialModel;
-        negMod[x] = 0;
-        return (doPll(posMod) || doPll(negMod));
-    }
-    else {
+
+bool dpll::doPll (vector<int>& partialModel) {
+    if (!unitProp(partialModel)) {
         return false;
     }
-}
-
-*/
-
+    bool allClausesSatisfied = true;
+    for (auto& clause : clauses) {
+        bool clauseSatisfied = false;
+        for (auto& literal : clause) {
+            uint parity = (literal > 0) ? TRUE : FALSE;
+            if (partialModel[abs(literal)] == parity) {
+                clauseSatisfied = true;
+                break;
+            }
+        }
+        if (!clauseSatisfied) {
+            allClausesSatisfied = false;
+            break;
+        }
+    }
+    if (allClausesSatisfied) {
+        finalModel = partialModel;
+        return true;
+    }
+    for (uint i = 1; i <= numVariables; i++) {
+        if (partialModel[i] == UNDEFINED) {
+            vector<int> posMod = partialModel;
+            posMod[i] = TRUE;
+            vector<int> negMod = partialModel;
+            negMod[i] = FALSE;
+            if (doPll(posMod) || doPll(negMod)) {
+                return true;
+            }
+            return false;
+        }
+    }
+    return false;
 }
 
 bool dpll::solve() {
-    vector<int> m(numVariables,UNDEFINED);
+    vector<int> m(numVariables + 1,UNDEFINED); // this one line ruined me
     return doPll(m);
 }
 
@@ -123,7 +148,7 @@ int main () {
     d.getInput();
 
     if (d.solve()) {
-        cout<<"TRUE\n";
+        cout<<"SAT\n";
         for (int i=1; i<d.finalModel.size(); i++) {
             cout<<i<<" : "<<d.finalModel[i]<<endl;
         }

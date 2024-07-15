@@ -1,4 +1,7 @@
 #include <bits/stdc++.h>
+#include <thread>
+#include <mutex>
+#include <atomic>
 using namespace std;
 
 enum RetVal {
@@ -152,60 +155,75 @@ int cdcl::getResult() {
 }
 
 int cdcl::unitPropogate(int decisionLevel) {
-    
-    bool unitClauseFound = false;
-    int falseCount = 0;
-    int unsetCount = 0;
-    int literalIndex;
-    bool satisfiedFlag = false;
-    int lastUnsetLiteral = -1;
 
-    do {
+    atomic<bool> conflictFound(false);
+    atomic<bool> unitClauseFound(false);
+    int conflictingVariable = -1;
+    int numThreads = thread::hardware_concurrency();
+    vector<thread> threads;
+    mutex mtx;
 
-        unitClauseFound = false;
-        for (int i=0; i<clauses.size() && !unitClauseFound; i++) {
-
-            falseCount = 0;
-            unsetCount = 0;
-            satisfiedFlag = false;
-
-            for (int j=0; j<clauses[i].size(); j++) {
-
-                literalIndex = literalToVar(clauses[i][j]);
+    auto worker = [&](int start, int end) {
+        for (int i = start; i < end; i++) {
+            if (conflictFound.load() || unitClauseFound.load()) {
+                return;
+            }
+            int falseCount = 0;
+            int unsetCount = 0;
+            bool satisfiedFlag = false;
+            int lastUnsetLiteral = -1;
+            for (int j = 0; j < clauses[i].size(); j++) {
+                int literalIndex = literalToVar(clauses[i][j]);
                 if (literals[literalIndex] == -1) {
-
                     unsetCount++;
                     lastUnsetLiteral = j;
-
-                } 
-                else if ((literals[literalIndex] == 0 && clauses[i][j] > 0) || (literals[literalIndex] == 1 && clauses[i][j] < 0)) {
+                } else if ((literals[literalIndex] == 0 && clauses[i][j] > 0) || (literals[literalIndex] == 1 && clauses[i][j] < 0)) {
                     falseCount++;
-                }
-                else {
+                } else {
                     satisfiedFlag = true;
                     break;
                 }
-
             }
-            
             if (satisfiedFlag) {
                 continue;
             }
             if (unsetCount == 1) {
-                assignLiteral(clauses[i][lastUnsetLiteral],decisionLevel,i);
-                unitClauseFound = true;
-                break;
+                {
+                    lock_guard<mutex> lock(mtx);
+                    if (!conflictFound.load()) {
+                        assignLiteral(clauses[i][lastUnsetLiteral], decisionLevel, i);
+                    }
+                }
+                unitClauseFound.store(true);
+            } else if (falseCount == clauses[i].size()) {
+                {
+                    lock_guard<mutex> lock(mtx);
+                    conflictFound.store(true);
+                    conflictingVariable = i;
+                }
+                return;
             }
-            else if (falseCount == clauses[i].size()) {
-                kappaAntecedent = i;
-                return RetVal::r_unsatisfied;
-            }
-
         }
+    };
 
+    do {
+        unitClauseFound.store(false);
+        threads.clear();
+        int chunkSize = (clauses.size() + numThreads - 1) / numThreads;
+        for (int i = 0; i < numThreads; i++) {
+            int start = i * chunkSize;
+            int end = min(start + chunkSize, int(clauses.size()));
+            threads.emplace_back(worker, start, end);
+        }
+        for (auto& t: threads) {
+            t.join();
+        }
+    } while (unitClauseFound.load());
+
+    if (conflictFound.load()) {
+        kappaAntecedent = conflictingVariable;
+        return r_unsatisfied;
     }
-    while (unitClauseFound);
-
     kappaAntecedent = -1;
     return r_normal;
 
