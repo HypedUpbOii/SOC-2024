@@ -368,8 +368,63 @@ t <-> (t1 -> t2) = (-t or (t1->t2)),(t or -(t1->t2)) = (-t or -t1 or t2),(t or -
 t <-> (t1 <-> t2) = (-t or -t1 or t2),(-t or t1 or -t2),(t or t1 or t2),(t or -t1 or -t2)
 
 */
-Variable t; // delete this lol
-return t; // delete this lol
+    Variable t;
+    t.Name(F->toString());
+    if (F->type == VARIABLE) {
+        t = F->var;
+        if (variables.find(t) == variables.end()) {
+            variables.emplace(t, counterVar);
+            counterVar++;
+        }
+        return t;
+    }
+    variables.emplace(t, counterVar);
+    counterVar++;
+    switch (F->type) {
+        case AND: {
+            auto t1 = convertFormula(F->left);
+            auto t2 = convertFormula(F->right);
+            clauses.push_back({-variables[t], variables[t1]});
+            clauses.push_back({-variables[t], variables[t2]});
+            clauses.push_back({variables[t], -variables[t1], -variables[t2]});
+            break;
+        }
+        case OR: {
+            auto t1 = convertFormula(F->left);
+            auto t2 = convertFormula(F->right);
+            clauses.push_back({variables[t], -variables[t1]});
+            clauses.push_back({variables[t], -variables[t2]});
+            clauses.push_back({-variables[t], variables[t1], variables[t2]});
+            break;
+        }
+        case NOT: {
+            auto t1 = convertFormula(F->left);
+            clauses.push_back({variables[t], variables[t1]});
+            clauses.push_back({-variables[t], -variables[t1]});
+            break;
+        }
+        case IF: {
+            auto t1 = convertFormula(F->left);
+            auto t2 = convertFormula(F->right);
+            clauses.push_back({variables[t], variables[t1]});
+            clauses.push_back({-variables[t], -variables[t2]});
+            clauses.push_back({-variables[t], -variables[t1], variables[t2]});
+            break;
+        }
+        case IFF: {
+            auto t1 = convertFormula(F->left);
+            auto t2 = convertFormula(F->right);
+            clauses.push_back({variables[t], variables[t1], variables[t2]});
+            clauses.push_back({variables[t], -variables[t1], -variables[t2]});
+            clauses.push_back({-variables[t], -variables[t1], variables[t2]});
+            clauses.push_back({-variables[t], variables[t1], -variables[t2]});
+            break;
+        }
+        default: {
+            throw runtime_error("Formula type kinda messed up...");
+        }
+    }
+    return t;
 }
 
 void cdcl::setup(vector<vector<int>> cl, int numLits) {

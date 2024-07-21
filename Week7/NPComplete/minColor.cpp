@@ -18,6 +18,7 @@ minimum color k that satisfies above constraint
 Use the SAT solver you built as an oracle to solve it
 
 */
+bool isSAT(int i, int numNodes, int numEdges, vector<pair<int,int>>& adjacencyList);
 
 int main() {
     int numNodes;
@@ -30,4 +31,46 @@ int main() {
         cin>>a>>b;
         adjacencyList.push_back(make_pair(a,b));
     }
+    for (int i = 1; i <= numNodes; i++) {
+        if(isSAT(i, numNodes, numEdges, adjacencyList)) {
+            cout << i << endl;
+            break;
+        }
+    }
+    return 0;
+}
+
+bool isSAT(int k, int numNodes, int numEdges, vector<pair<int,int>>& edges) {
+    SATSolver s;
+    vector<shared_ptr<Formula>> Variables(numNodes * k);
+    Variable v;
+    for (int i = 0; i < numNodes; i++) {
+        for (int j = 0; j < k; j++) {
+            v.Name(to_string(i + 1) + "_" + to_string(j + 1));
+            Variables[(i * k) + j] = make_shared<Formula>(v);
+        }
+    }
+    for (int i = 0; i < numNodes; i++) {
+        auto F = Variables[(i * k)];
+        for (int j = 1; j < k; j++) {
+            F = Formula::Or(F, Variables[(i * k) + j]);
+        }
+        s.add(F);
+    }
+    for (int p = 0; p < numNodes; p++) {
+        for (int q = 0; q < k - 1; q++) {
+            for (int r = q + 1; r < k; r++) {
+                s.add(Formula::Or(Formula::Not(Variables[(p * k) + q]), Formula::Not(Variables[(p * k) + r])));
+            }
+        }
+    }
+    for (int i = 0; i < numEdges; i++) {
+        for (int j = 0; j < k; j++) {
+            int p = edges[i].first - 1;
+            int q = edges[i].second - 1;
+            s.add(Formula::Or(Formula::Not(Variables[(p * k + j)]), Formula::Not(Variables[(q * k) + j])));
+        }
+    }
+    s.solve();
+    return s.result;
 }

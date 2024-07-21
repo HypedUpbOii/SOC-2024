@@ -11,6 +11,7 @@ It is guaranteed all entries of V are unique (i.e. V is not a multiset)
 Either solve this in polynomial time OR use the SAT solver
 
 */
+bool isSat(int k, int numVertices, vector<vector<int>>& Subsets);
 
 int main () {
     int lengthOfSet;
@@ -45,4 +46,55 @@ int main () {
     int k;
     cin>>k;
 
+    if(isSat(k, lengthOfSet, S)) {
+        cout << "Possible" << endl;
+    } else {
+        cout << "Impossible" << endl;
+    }
+}
+
+bool isSat(int k, int numVertices, vector<vector<int>>& Subsets) {
+    SATSolver s;
+    vector<shared_ptr<Formula>> Variables(Subsets.size());
+    Variable v;
+    for (int i = 0; i < Subsets.size(); i++) {
+        v.Name(to_string(i + 1));
+        Variables[i] = make_shared<Formula>(v);
+    }
+    vector<vector<int>> varInSubsets(numVertices);
+    for (int p = 0; p < numVertices; p++) {
+        for (int q = 0; q < Subsets.size(); q++) {
+            if (find(Subsets[q].begin(), Subsets[q].end(), p + 1) != Subsets[q].end()) {
+                varInSubsets[p].push_back(q);
+            }
+        }
+    }
+    for (int i = 0; i < varInSubsets.size(); i++) {
+        shared_ptr<Formula> F = Variables[varInSubsets[i][0]];
+        for (int j = 1; j < varInSubsets[i].size(); j++) {
+            F = Formula::Or(F, Variables[varInSubsets[i][j]]);
+        }
+        s.add(F);
+    }
+    vector<vector<shared_ptr<Formula>>> AtMostK(Subsets.size() + 1, vector<shared_ptr<Formula>>(k + 2));
+    for (int i = 0; i <= Subsets.size(); i++) {
+        v.Name(to_string(i) + "_0");
+        AtMostK[i][0] = make_shared<Formula>(v);
+        s.add(AtMostK[i][0]);
+    }
+    for (int j = 1; j <= k + 1; j++) {
+        v.Name("0_" + to_string(j));
+        AtMostK[0][j] = make_shared<Formula>(v);
+        s.add(Formula::Not(AtMostK[0][j]));
+    }
+    for (int i = 1; i <= Subsets.size(); i++) {
+        for (int j = 1; j <= k + 1; j++) {
+            v.Name(to_string(i) + "_" + to_string(j));
+            AtMostK[i][j] = make_shared<Formula>(v);
+            s.add(Formula::Iff(AtMostK[i][j], Formula::Or(Formula::And(Variables[i - 1], AtMostK[i - 1][j - 1]), AtMostK[i - 1][j])));
+        }
+    }
+    s.add(Formula::Not(AtMostK[Subsets.size()][k + 1]));
+    s.solve();
+    return s.result;
 }
